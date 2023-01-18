@@ -71,6 +71,8 @@ func main() { // nolint:gocognit
 		}
 	}()
 
+	fmt.Printf("Peer connection created\n")
+
 	// When an ICE candidate is available send to the other Pion instance
 	// the other Pion instance will add this candidate by calling AddICECandidate
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -83,9 +85,13 @@ func main() { // nolint:gocognit
 
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
+			fmt.Printf("Candidate received, desc nil\n")
 			pendingCandidates = append(pendingCandidates, c)
-		} else if onICECandidateErr := signalCandidate(*offerAddr, c); onICECandidateErr != nil {
-			panic(onICECandidateErr)
+		} else {
+			fmt.Printf("Candidate received, desc %s\n", desc)
+			if onICECandidateErr := signalCandidate(*offerAddr, c); onICECandidateErr != nil {
+				panic(onICECandidateErr)
+			}
 		}
 	})
 
@@ -97,6 +103,9 @@ func main() { // nolint:gocognit
 		if candidateErr != nil {
 			panic(candidateErr)
 		}
+
+		fmt.Printf("Response Candidate received\n")
+
 		if candidateErr := peerConnection.AddICECandidate(webrtc.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 			panic(candidateErr)
 		}
@@ -109,6 +118,8 @@ func main() { // nolint:gocognit
 			panic(err)
 		}
 
+		fmt.Printf("SDP received: %s\n", sdp)
+
 		if err := peerConnection.SetRemoteDescription(sdp); err != nil {
 			panic(err)
 		}
@@ -118,6 +129,8 @@ func main() { // nolint:gocognit
 		if err != nil {
 			panic(err)
 		}
+
+		fmt.Printf("Answer created: %s\n", answer)
 
 		// Send our answer to the HTTP server listening in the other process
 		payload, err := json.Marshal(answer)
@@ -131,14 +144,19 @@ func main() { // nolint:gocognit
 			panic(closeErr)
 		}
 
+		fmt.Printf("Answer posted")
+
 		// Sets the LocalDescription, and starts our UDP listeners
 		err = peerConnection.SetLocalDescription(answer)
 		if err != nil {
 			panic(err)
 		}
 
+		fmt.Printf("Description set")
+
 		candidatesMux.Lock()
 		for _, c := range pendingCandidates {
+			fmt.Printf("Signaling candidate %d", c)
 			onICECandidateErr := signalCandidate(*offerAddr, c)
 			if onICECandidateErr != nil {
 				panic(onICECandidateErr)
@@ -186,6 +204,8 @@ func main() { // nolint:gocognit
 			fmt.Printf("Message from DataChannel '%s': '%s'\n", d.Label(), string(msg.Data))
 		})
 	})
+
+	fmt.Printf("Starting server\n")
 
 	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
 	panic(http.ListenAndServe(*answerAddr, nil))
