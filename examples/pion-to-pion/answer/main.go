@@ -47,7 +47,9 @@ func main() { // nolint:gocognit
 			},
 		},
 	}
-
+/*
+{ iceServers: [stun:vpn1.airtop.io:3478?transport=tcp, turn:vpn1.airtop.io:8443?transport=udp, turn:vpn1.airtop.io:8443?transport=tcp], iceTransportPolicy: all, bundlePolicy: balanced, rtcpMuxPolicy: require, iceCandidatePoolSize: 0 }
+*/
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {
