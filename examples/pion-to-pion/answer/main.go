@@ -36,10 +36,11 @@ func main() { // nolint:gocognit
 	flag.Parse()
 
 	fmt.Printf("Answer address: %s\n", *answerAddr)
-	fmt.Printf("Offer address: %s\n", *offerAddr)
+	fmt.Printf(" Offer address: %s\n", *offerAddr)
 
 	var candidatesMux sync.Mutex
 	pendingCandidates := make([]*webrtc.ICECandidate, 0)
+
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
@@ -69,8 +70,8 @@ func main() { // nolint:gocognit
 		panic(err)
 	}
 	defer func() {
-		if err := peerConnection.Close(); err != nil {
-			fmt.Printf("cannot close peerConnection: %v\n", err)
+		if cErr := peerConnection.Close(); cErr != nil {
+			fmt.Printf("cannot close peerConnection: %v\n", cErr)
 		}
 	}()
 
@@ -116,15 +117,17 @@ func main() { // nolint:gocognit
 
 	// A HTTP handler that processes a SessionDescription given to us from the other Pion process
 	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Request on /sdp\n")
+
 		sdp := webrtc.SessionDescription{}
-		if err := json.NewDecoder(r.Body).Decode(&sdp); err != nil {
-			panic(err)
+		if sdpErr := json.NewDecoder(r.Body).Decode(&sdp); sdpErr != nil {
+			panic(sdpErr)
 		}
 
 		fmt.Printf("SDP received: %s\n", sdp)
 
-		if err := peerConnection.SetRemoteDescription(sdp); err != nil {
-			panic(err)
+		if sdpErr := peerConnection.SetRemoteDescription(sdp); sdpErr != nil {
+			panic(sdpErr)
 		}
 
 		// Create an answer to send to the other process
@@ -211,5 +214,9 @@ func main() { // nolint:gocognit
 	fmt.Printf("Starting server\n")
 
 	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
-	panic(http.ListenAndServe(*answerAddr, nil))
+	go func() { panic(http.ListenAndServe(*answerAddr, nil)) }()
+	//panic(http.ListenAndServe(*answerAddr, nil))
+
+	// Block forever
+	select {}
 }
