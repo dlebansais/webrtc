@@ -43,7 +43,9 @@ func main() { // nolint:gocognit
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
+				URLs: []string{"stun:vpn1.airtop.io:3478?transport=tcp"},
+				URLs: []string{"turn:vpn1.airtop.io:8443?transport=udp"},
+				URLs: []string{"turn:vpn1.airtop.io:8443?transport=tcp"},
 			},
 		},
 	}
