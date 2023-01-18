@@ -44,14 +44,22 @@ func main() { // nolint:gocognit
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:vpn1.airtop.io:3478?transport=tcp"},
+			},
+			{
 				URLs: []string{"turn:vpn1.airtop.io:8443?transport=udp"},
+				Username: "JnE3qxanXcfLgYRm_server",
+				Credential: "tbsC9AmnxRbW4edT_server",
+				CredentialType: webrtc.ICECredentialTypePassword,
+			},
+			{
 				URLs: []string{"turn:vpn1.airtop.io:8443?transport=tcp"},
+				Username: "JnE3qxanXcfLgYRm_server",
+				Credential: "tbsC9AmnxRbW4edT_server",
+				CredentialType: webrtc.ICECredentialTypePassword,
 			},
 		},
 	}
-/*
-{ iceServers: [stun:vpn1.airtop.io:3478?transport=tcp, turn:vpn1.airtop.io:8443?transport=udp, turn:vpn1.airtop.io:8443?transport=tcp], iceTransportPolicy: all, bundlePolicy: balanced, rtcpMuxPolicy: require, iceCandidatePoolSize: 0 }
-*/
+
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {

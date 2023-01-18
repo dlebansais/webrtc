@@ -1,5 +1,10 @@
 package main
 
+/*
+anwer -answer-address :22572 -offer-address 93.27.219.154:22572
+offer -answer-address vpn1.airtop.io:22570 -offer-address :22572
+*/
+
 import (
 	"bytes"
 	"encoding/json"
@@ -11,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dlebansais/webrtc/v3"
-	"github.com/dlebansais/webrtc/v3/examples/internal/signal"
+	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
 func signalCandidate(addr string, c *webrtc.ICECandidate) error {
@@ -43,7 +48,19 @@ func main() { //nolint:gocognit
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
+				URLs: []string{"stun:vpn1.airtop.io:3478?transport=tcp"},
+			},
+			{
+				URLs: []string{"turn:vpn1.airtop.io:8443?transport=udp"},
+				Username: "JnE3qxanXcfLgYRm_server",
+				Credential: "tbsC9AmnxRbW4edT_server",
+				CredentialType: webrtc.ICECredentialTypePassword,
+			},
+			{
+				URLs: []string{"turn:vpn1.airtop.io:8443?transport=tcp"},
+				Username: "JnE3qxanXcfLgYRm_server",
+				Credential: "tbsC9AmnxRbW4edT_server",
+				CredentialType: webrtc.ICECredentialTypePassword,
 			},
 		},
 	}
@@ -59,6 +76,8 @@ func main() { //nolint:gocognit
 		}
 	}()
 
+	fmt.Printf("Peer connection created\n")
+
 	// When an ICE candidate is available send to the other Pion instance
 	// the other Pion instance will add this candidate by calling AddICECandidate
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -71,9 +90,13 @@ func main() { //nolint:gocognit
 
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
+			fmt.Printf("Candidate received, desc nil\n")
 			pendingCandidates = append(pendingCandidates, c)
-		} else if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
-			panic(onICECandidateErr)
+		} else {
+			fmt.Printf("Candidate received, desc %s\n", desc)
+			if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
+				panic(onICECandidateErr)
+			}
 		}
 	})
 
@@ -85,6 +108,9 @@ func main() { //nolint:gocognit
 		if candidateErr != nil {
 			panic(candidateErr)
 		}
+
+		fmt.Printf("Response Candidate received\n")
+
 		if candidateErr := peerConnection.AddICECandidate(webrtc.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 			panic(candidateErr)
 		}
@@ -97,6 +123,8 @@ func main() { //nolint:gocognit
 			panic(sdpErr)
 		}
 
+		fmt.Printf("SDP received: %s\n", sdp)
+
 		if sdpErr := peerConnection.SetRemoteDescription(sdp); sdpErr != nil {
 			panic(sdpErr)
 		}
@@ -105,13 +133,21 @@ func main() { //nolint:gocognit
 		defer candidatesMux.Unlock()
 
 		for _, c := range pendingCandidates {
+
+			fmt.Printf("Trying candidate %d\n", c)
+
 			if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
 				panic(onICECandidateErr)
 			}
 		}
 	})
+
+	fmt.Printf("Starting server\n")
+
 	// Start HTTP server that accepts requests from the answer process
 	go func() { panic(http.ListenAndServe(*offerAddr, nil)) }()
+
+	fmt.Printf("Creating data channel\n")
 
 	// Create a datachannel with label 'data'
 	dataChannel, err := peerConnection.CreateDataChannel("data", nil)
@@ -154,17 +190,23 @@ func main() { //nolint:gocognit
 		fmt.Printf("Message from DataChannel '%s': '%s'\n", dataChannel.Label(), string(msg.Data))
 	})
 
+	fmt.Printf("Creating offer\n")
+
 	// Create an offer to send to the other process
 	offer, err := peerConnection.CreateOffer(nil)
 	if err != nil {
 		panic(err)
 	}
 
+	fmt.Printf("Setting local description\n")
+
 	// Sets the LocalDescription, and starts our UDP listeners
 	// Note: this will start the gathering of ICE candidates
 	if err = peerConnection.SetLocalDescription(offer); err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("Sending offer\n")
 
 	// Send our offer to the HTTP server listening in the other process
 	payload, err := json.Marshal(offer)
@@ -177,6 +219,8 @@ func main() { //nolint:gocognit
 	} else if err := resp.Body.Close(); err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("Offer sent\n")
 
 	// Block forever
 	select {}
