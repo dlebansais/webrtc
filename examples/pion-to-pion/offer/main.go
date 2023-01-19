@@ -94,14 +94,13 @@ func main() { // nolint:gocognit
 		candidatesMux.Lock()
 		defer candidatesMux.Unlock()
 
-		fmt.Printf("Address: %s\n", c.Address)
-
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
 			fmt.Printf("Candidate received, no remote description\n")
 			pendingCandidates = append(pendingCandidates, c)
 		} else {
-			fmt.Printf("Candidate received, desc %s\n", desc)
+			//fmt.Printf("Candidate received, desc %s\n", desc)
+			fmt.Printf("Candidate received\n")
 			if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
 				panic(onICECandidateErr)
 			}
@@ -121,32 +120,6 @@ func main() { // nolint:gocognit
 
 		if candidateErr := peerConnection.AddICECandidate(webrtc.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 			panic(candidateErr)
-		}
-	})
-
-	// A HTTP handler that processes a SessionDescription given to us from the other Pion process
-	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) {
-		sdp := webrtc.SessionDescription{}
-		if sdpErr := json.NewDecoder(r.Body).Decode(&sdp); sdpErr != nil {
-			panic(sdpErr)
-		}
-
-		fmt.Printf("SDP received: %s\n", sdp)
-
-		if sdpErr := peerConnection.SetRemoteDescription(sdp); sdpErr != nil {
-			panic(sdpErr)
-		}
-
-		candidatesMux.Lock()
-		defer candidatesMux.Unlock()
-
-		for _, c := range pendingCandidates {
-
-			fmt.Printf("Trying candidate %d\n", c)
-
-			if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
-				panic(onICECandidateErr)
-			}
 		}
 	})
 
@@ -181,7 +154,7 @@ func main() { // nolint:gocognit
 	dataChannel.OnOpen(func() {
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label(), dataChannel.ID())
 
-		for range time.NewTicker(5 * time.Second).C {
+		for range time.NewTicker(1 * time.Second).C {
 			message := signal.RandSeq(15)
 			fmt.Printf("Sending '%s'\n", message)
 
@@ -214,6 +187,8 @@ func main() { // nolint:gocognit
 		panic(err)
 	}
 
+	fmt.Printf("LOCAL DESCRIPTION SET\n")
+
 	fmt.Printf("Sending offer\n")
 
 	// Send our offer to the HTTP server listening in the other process
@@ -225,11 +200,64 @@ func main() { // nolint:gocognit
 	resp, err := http.Post(fmt.Sprintf("http://%s/sdp", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload)) // nolint:noctx
 	if err != nil {
 		panic(err)
-	} else if err := resp.Body.Close(); err != nil {
+	} 
+
+	fmt.Printf("Offer sent, response available\n")
+
+	sdpResp := webrtc.SessionDescription{}
+	if sdpErr := json.NewDecoder(resp.Body).Decode(&sdpResp); sdpErr != nil {
+		panic(sdpErr)
+	}
+	
+	if err := resp.Body.Close(); err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("Offer sent\n")
+	//fmt.Printf("Response: %s\n", sdpResp)
+
+	if sdpSetErr := peerConnection.SetRemoteDescription(sdpResp); sdpSetErr != nil {
+		panic(sdpSetErr)
+	}
+
+	fmt.Printf("REMOTE DESCRIPTION SET\n")
+
+	fmt.Printf("Getting server candidates\n")
+
+	validCandidate := true
+	for validCandidate {
+
+		validCandidate = false
+
+		respCand, errCand := http.Post(fmt.Sprintf("http://%s/getcandidate", *answerAddr), "application/json; charset=utf-8", nil)
+		if errCand != nil {
+			panic(errCand)
+		} 
+
+		fmt.Printf("Get Candidate sent, response available\n")
+
+		receivedCandidates := make([]*webrtc.ICECandidate, 1)
+		candErr := json.NewDecoder(respCand.Body).Decode(&receivedCandidates[0])
+
+		if candErr == nil {
+
+			validCandidate = true
+			newCandidate := receivedCandidates[0]
+
+			fmt.Printf("Candidate decoded\n")
+
+			if candidateErr := peerConnection.AddICECandidate(newCandidate.ToJSON()); candidateErr != nil {
+				panic(candidateErr)
+			}
+
+			fmt.Printf("Candidate added\n")
+		}
+	
+		if err := respCand.Body.Close(); err != nil {
+			panic(err)
+		}
+	}
+
+	fmt.Printf("No more candidate\n")
 
 	// Block forever
 	select {}
