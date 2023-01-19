@@ -89,7 +89,7 @@ func main() { // nolint:gocognit
 
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
-			fmt.Printf("Candidate received, desc nil\n")
+			fmt.Printf("Candidate received, no remote description\n")
 			pendingCandidates = append(pendingCandidates, c)
 		} else {
 			fmt.Printf("Candidate received, desc %s\n", desc)

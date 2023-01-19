@@ -50,8 +50,14 @@ func main() { // nolint:gocognit
 	// Prepare the configuration
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
+/*			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},*/
 			{
-				URLs: []string{"stun:vpn1.airtop.io:3478?transport=tcp"},
+				URLs: []string{"stun:vpn1.airtop.io:3478?transport=udp"},
+				Username: "",
+				Credential: nil,
+				CredentialType: webrtc.ICECredentialTypePassword,
 			},
 			{
 				URLs: []string{"turn:vpn1.airtop.io:8443?transport=udp"},
@@ -66,6 +72,13 @@ func main() { // nolint:gocognit
 				CredentialType: webrtc.ICECredentialTypePassword,
 			},
 		},
+/*		ICETransportPolicy: webrtc.ICETransportPolicyAll,
+		BundlePolicy: webrtc.BundlePolicyMaxBundle,
+		RTCPMuxPolicy: webrtc.RTCPMuxPolicyNegotiate,
+		PeerIdentity: "",
+		Certificates:[]webrtc.Certificate{},
+		ICECandidatePoolSize:0,
+		SDPSemantics: webrtc.SDPSemanticsUnifiedPlan,*/
 	}
 
 	// Create a new RTCPeerConnection
@@ -91,9 +104,11 @@ func main() { // nolint:gocognit
 		candidatesMux.Lock()
 		defer candidatesMux.Unlock()
 
+		fmt.Printf("Address: %s\n", c.Address)
+
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
-			fmt.Printf("Candidate received, desc nil\n")
+			fmt.Printf("Candidate received, no remote description\n")
 			pendingCandidates = append(pendingCandidates, c)
 		} else {
 			fmt.Printf("Candidate received, desc %s\n", desc)
@@ -216,7 +231,8 @@ func main() { // nolint:gocognit
 	if err != nil {
 		panic(err)
 	}
-	resp, err := http.Post(fmt.Sprintf("http://%s/sdp", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload)) // nolint:noctx
+	
+	resp, err := http.Post("http://vpn1.airtop.io/sdp:22570", "application/json; charset=utf-8", bytes.NewReader(payload)) // nolint:noctx
 	if err != nil {
 		panic(err)
 	} else if err := resp.Body.Close(); err != nil {
