@@ -31,7 +31,7 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 }
 
 func main() { // nolint:gocognit
-	answerAddr := flag.String("answer-address", ":22570", "Address that the Answer HTTP server is hosted on.")
+	answerAddr := flag.String("answer-address", ":22570", "Address that the Answer HTTP server is listening on.")
 	flag.Parse()
 
 	fmt.Printf("Answer address: %s\n", *answerAddr)
