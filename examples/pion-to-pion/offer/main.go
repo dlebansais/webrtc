@@ -1,10 +1,5 @@
 package main
 
-/*
-anwer -answer-address :22572 -offer-address 93.27.219.154:22572
-offer -answer-address vpn1.airtop.io:22570 -offer-address :22572
-*/
-
 import (
 	"bytes"
 	"encoding/json"
@@ -35,11 +30,9 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 }
 
 func main() { // nolint:gocognit
-	offerAddr := flag.String("offer-address", ":22572", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", "vpn1.airtop.io:22570", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()
 
-	fmt.Printf(" Offer address: %s\n", *offerAddr)
 	fmt.Printf("Answer address: %s\n", *answerAddr)
 
 	var candidatesMux sync.Mutex
@@ -124,9 +117,6 @@ func main() { // nolint:gocognit
 	})
 
 	fmt.Printf("Starting server\n")
-
-	// Start HTTP server that accepts requests from the answer process
-	go func() { panic(http.ListenAndServe(*offerAddr, nil)) }()
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected

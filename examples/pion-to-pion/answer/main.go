@@ -31,12 +31,10 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 }
 
 func main() { // nolint:gocognit
-	offerAddr := flag.String("offer-address", "localhost:22572", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", ":22570", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()
 
 	fmt.Printf("Answer address: %s\n", *answerAddr)
-	fmt.Printf(" Offer address: %s\n", *offerAddr)
 
 	var candidatesMux sync.Mutex
 	pendingCandidates := make([]*webrtc.ICECandidate, 0)
