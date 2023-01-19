@@ -90,12 +90,11 @@ func main() { // nolint:gocognit
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
 			fmt.Printf("Candidate received, no remote description\n")
-			pendingCandidates = append(pendingCandidates, c)
 		} else {
-			fmt.Printf("Candidate received, desc %s\n", desc)
-			if onICECandidateErr := signalCandidate(*offerAddr, c); onICECandidateErr != nil {
-				panic(onICECandidateErr)
-			}
+			//fmt.Printf("Candidate received\n******\n%s\n******\n", desc)
+			fmt.Printf("Candidate received\n")
+
+			pendingCandidates = append(pendingCandidates, c)
 		}
 	})
 
@@ -124,33 +123,23 @@ func main() { // nolint:gocognit
 			panic(sdpErr)
 		}
 
-		fmt.Printf("SDP received: %s\n", sdp)
+		//fmt.Printf("SDP received:\n******\n%s\n******\n", sdp)
+		fmt.Printf("SDP received\n")
 
 		if sdpErr := peerConnection.SetRemoteDescription(sdp); sdpErr != nil {
 			panic(sdpErr)
 		}
 
+		fmt.Printf("REMOTE DESCRIPTION SET\n")
+		
 		// Create an answer to send to the other process
 		answer, err := peerConnection.CreateAnswer(nil)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Printf("Answer created: %s\n", answer)
-
-		// Send our answer to the HTTP server listening in the other process
-		payload, err := json.Marshal(answer)
-		if err != nil {
-			panic(err)
-		}
-		resp, err := http.Post(fmt.Sprintf("http://%s/sdp", *offerAddr), "application/json; charset=utf-8", bytes.NewReader(payload)) // nolint:noctx
-		if err != nil {
-			panic(err)
-		} else if closeErr := resp.Body.Close(); closeErr != nil {
-			panic(closeErr)
-		}
-
-		fmt.Printf("Answer posted")
+		//fmt.Printf("Answer created:\n******%s\n******\n", answer)
+		fmt.Printf("Answer created\n")
 
 		// Sets the LocalDescription, and starts our UDP listeners
 		err = peerConnection.SetLocalDescription(answer)
@@ -158,17 +147,40 @@ func main() { // nolint:gocognit
 			panic(err)
 		}
 
-		fmt.Printf("Description set")
+		fmt.Printf("LOCAL DESCRIPTION SET\n")
+
+		fmt.Printf("Creating response\n")
+
+		payload, err := json.Marshal(answer)
+		if err != nil {
+			panic(err)
+		}
+		
+		w.Write(payload);
+
+		fmt.Printf("Request on /sdp has been handled\n")
+	})
+
+	// A HTTP handler that processes a get candidate request
+	http.HandleFunc("/getcandidate", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Request on /getcandidate\n")
 
 		candidatesMux.Lock()
-		for _, c := range pendingCandidates {
-			fmt.Printf("Signaling candidate %d", c)
-			onICECandidateErr := signalCandidate(*offerAddr, c)
-			if onICECandidateErr != nil {
-				panic(onICECandidateErr)
+		defer candidatesMux.Unlock()
+
+		if len(pendingCandidates) > 0 {
+			candidate := pendingCandidates[0]
+			pendingCandidates = pendingCandidates[1:]
+
+			payload, err := json.Marshal(candidate)
+			if err != nil {
+				panic(err)
 			}
+			
+			w.Write(payload);
 		}
-		candidatesMux.Unlock()
+
+		fmt.Printf("Request on /getcandidate has been handled\n")
 	})
 
 	// Set the handler for Peer connection state
@@ -193,7 +205,7 @@ func main() { // nolint:gocognit
 		d.OnOpen(func() {
 			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
 
-			for range time.NewTicker(5 * time.Second).C {
+			for range time.NewTicker(1 * time.Second).C {
 				message := signal.RandSeq(15)
 				fmt.Printf("Sending '%s'\n", message)
 
@@ -214,9 +226,5 @@ func main() { // nolint:gocognit
 	fmt.Printf("Starting server\n")
 
 	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
-	go func() { panic(http.ListenAndServe(*answerAddr, nil)) }()
-	//panic(http.ListenAndServe(*answerAddr, nil))
-
-	// Block forever
-	select {}
+	panic(http.ListenAndServe(*answerAddr, nil))
 }
