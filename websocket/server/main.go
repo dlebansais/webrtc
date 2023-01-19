@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -10,40 +10,40 @@ import (
 
 var upgrader = websocket.Upgrader{}
 
-func main() { // nolint:gocognit
-	answerAddr := flag.String("answer-address", ":22570", "Address that the Answer HTTP server is listening on.")
-	flag.Parse()
-
-	fmt.Printf("Answer address: %s\n", *answerAddr)
-
-	// A HTTP handler that processes a connection request
-	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("Request on /connect\n")
-
-		socketConn, err := upgrader.Upgrade(w, r, nil)
+func connect(w http.ResponseWriter, r *http.Request) {
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("upgrade:", err)
+		return
+	}
+	defer c.Close()
+	for {
+		mt, message, err := c.ReadMessage()
 		if err != nil {
-			panic(err)
+			log.Println("read:", err)
+			break
 		}
-
-		go HandleClient(socketConn)
-
-		fmt.Printf("Request on /connect has been handled\n")
-	})
-
-	fmt.Printf("Starting server\n")
-
-	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
-	panic(http.ListenAndServe(*answerAddr, nil))
+		log.Printf("recv: %s", message)
+		err = c.WriteMessage(mt, message)
+		if err != nil {
+			log.Println("write:", err)
+			break
+		}
+	}
 }
 
-func HandleClient(socketConn *websocket.Conn) {
-	fmt.Printf("Handling client\n")
+func main() { // nolint:gocognit
+	serverAddr := flag.String("server-address", ":22570", "Address that the Answer HTTP server is listening on.")
+	flag.Parse()
 
-	localAddr := socketConn.LocalAddr()
+	log.SetFlags(0)
 
-	fmt.Printf("localAddr: %s\n", localAddr)
+	log.Printf("Server address: %s\n", *serverAddr)
 
-	socketConn.Close();
+	http.HandleFunc("/connect", connect)
 
-	fmt.Printf("Connection closed\n")
+	log.Printf("Starting server\n")
+
+	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
+	log.Fatal(http.ListenAndServe(*serverAddr, nil))
 }
