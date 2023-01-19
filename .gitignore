@@ -33,3 +33,7 @@ wasm_exec.js
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
+
+*.mod
+*.sum
+
